@@ -77,11 +77,31 @@ PHP_FUNCTION(calcpi)
 {
 	int argc = ZEND_NUM_ARGS();
 	long iterations;
+    int index, hits;
+    double randx, randy, distance, value;
 
 	if (zend_parse_parameters(argc TSRMLS_CC, "l", &iterations) == FAILURE) 
 		return;
 
-	php_error(E_WARNING, "calcpi: not yet implemented");
+    hits = 0;
+    for (index = 0; index < iterations; index++) {
+        randx = rand();
+        randy = rand();
+
+        randx /= RAND_MAX;
+        randy /= RAND_MAX;
+
+        distance = sqrt((randx * randx) + (randy * randy));
+        if (distance <= 1.0) {
+            hits++;
+        }
+        value = ((double) hits / (double) index);
+        value *= 4.0;
+    }
+
+    value = ((double) hits / (double) iterations);
+    value *= 4.0;
+    RETVAL_DOUBLE(value);
 }
 /* }}} */
 
@@ -92,11 +112,20 @@ PHP_FUNCTION(reverse)
 	char *input = NULL;
 	int argc = ZEND_NUM_ARGS();
 	int input_len;
+    char *workstr;
+    int index;
 
 	if (zend_parse_parameters(argc TSRMLS_CC, "s", &input, &input_len) == FAILURE) 
 		return;
+    
+    workstr = (char*) emalloc(input_len + 1);
+    memset(workstr, 0, input_len + 1);
+    for (index = 0; index < input_len; index++) {
+        workstr[index] = input[input_len - (index + 1)];
+    }
 
-	php_error(E_WARNING, "reverse: not yet implemented");
+    RETVAL_STRING(workstr, 1);
+    efree(workstr);
 }
 /* }}} */
 
@@ -108,11 +137,42 @@ PHP_FUNCTION(uniquechars)
 	int argc = ZEND_NUM_ARGS();
 	int input_len;
 	zend_bool case_sensitive;
+    char* workbuf;
+    int index, work_index;
 
 	if (zend_parse_parameters(argc TSRMLS_CC, "s|b", &input, &input_len, &case_sensitive) == FAILURE) 
 		return;
 
-	php_error(E_WARNING, "uniquechars: not yet implemented");
+    if (argc == 1) {
+        case_sensitive = 1;
+    }
+
+    work_index = 0;
+    workbuf = (char*) emalloc(input_len + 1);
+    memset(workbuf, 0, input_len + 1);
+
+    for (index = 0; index < input_len; index++) {
+        if (case_sensitive) {
+            if (!strchr(workbuf, input[index])) {
+                workbuf[work_index] = input[index];
+                work_index++;
+            }
+        } else {
+            if (!strchr(workbuf, tolower(input[index]))) {
+                workbuf[work_index] = tolower(input[index]);
+                work_index++;
+            }
+        }
+    }
+
+    array_init(return_value);
+    for (index = 0; index < input_len; index++) {
+        if (workbuf[index] != '\0') {
+            add_next_index_stringl(return_value, &workbuf[index], 1, 1);
+        }
+    }
+
+    efree(workbuf);
 }
 /* }}} */
 
