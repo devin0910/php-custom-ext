@@ -359,6 +359,86 @@ PHP_FUNCTION(traverse_array)
     }
 }
 
+PHP_FUNCTION(traverse_array_r)
+{
+    zval* array;
+    zval** item;
+    int count, i;
+    char buffer[1024];
+
+    array_init(return_value);
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "a", &array) == FAILURE) {
+        return;
+    }
+
+    // get number of elements in the array
+    count = zend_hash_num_elements(Z_ARRVAL_P(array));
+    sprintf(buffer, "array_size = %d", count);
+    add_next_index_string(return_value, buffer, 1);
+
+    // move to the begining of the array
+    zend_hash_internal_pointer_end(Z_ARRVAL_P(array));
+    for (i = 0; i < count; i++) {
+        char* key;
+        int ind;
+
+        // get the data in the current array element and coerce into a string
+        zend_hash_get_current_data(Z_ARRVAL_P(array), (void **) &item);
+        convert_to_string_ex(item);
+
+        // get the key (note this function returns key type)
+        if (zend_hash_get_current_key(Z_ARRVAL_P(array), &key, &ind, 0) == HASH_KEY_IS_STRING) {
+            sprintf(buffer, "array[%s] = %s", key, Z_STRVAL_PP(item));
+            add_next_index_string(return_value, buffer, 1);
+        } else {
+           sprintf(buffer, "array[%d] = %s", ind, Z_STRVAL_PP(item));
+           add_next_index_string(return_value, buffer, 1);
+       }
+
+       zend_hash_move_backwards(Z_ARRVAL_P(array));
+    }
+}
+
+PHP_FUNCTION(array_find)
+{
+    zval* array;
+    zval** item;
+    int long_index;
+    char* string_index;
+    int string_index_len;
+    char buffer[1024];
+
+    array_init(return_value);
+
+    if (zend_parse_parameters_ex(ZEND_PARSE_PARAMS_QUIET, ZEND_NUM_ARGS() TSRMLS_CC, "al", &array, &long_index) == SUCCESS) {
+        // find item indexed by integer, long index
+        if (zend_hash_index_find(Z_ARRVAL_P(array), long_index, (void **)&item) == SUCCESS) {
+            convert_to_string_ex(item);
+            sprintf(buffer, "index [%d] found containing data %s", long_index, Z_STRVAL_PP(item));
+            add_next_index_string(return_value, buffer, 1);
+            zend_hash_get_current_data(Z_ARRVAL_P(array), (void**) &item);
+            convert_to_string_ex(item);
+            sprintf(buffer, "data at current array location: %s", Z_STRVAL_PP(item));
+            add_next_index_string(return_value, buffer, 1);
+        } else if (zend_parse_parameters_ex(ZEND_PARSE_PARAMS_QUIET, ZEND_NUM_ARGS() TSRMLS_CC, "as" , &array, &string_index, &string_index_len) == SUCCESS) {
+            // find item indexed by assoc string
+            if (zend_hash_find(Z_ARRVAL_P(array), string_index, string_index_len + 1, (void **)&item) == SUCCESS) {
+                convert_to_string_ex(item);
+                sprintf(buffer, "index [%s] found containing data %s", string_index, Z_STRVAL_PP(item));
+                add_next_index_string(return_value, buffer, 1);
+                zend_hash_get_current_data(Z_ARRVAL_P(array), (void**) &item);
+                convert_to_string_ex(item);
+                sprintf(buffer, "data at current array location: %s", Z_STRVAL_PP(item));
+                add_next_index_string(return_value, buffer, 1);
+            }
+        } else {
+            php_error(E_WARNING, "usage %s(array, [string|integer])", get_active_function_name(TSRMLS_C));
+            RETURN_FALSE;
+        }
+    }
+}
+
 /* {{{ php_zero_init_globals
  */
 /* Uncomment this function if you have INI entries
@@ -440,6 +520,8 @@ const zend_function_entry zero_functions[] = {
     PHP_FE(return_array3,   NULL)
     PHP_FE(return_array4,   NULL)
     PHP_FE(traverse_array,   NULL)
+    PHP_FE(traverse_array_r,   NULL)
+    PHP_FE(array_find,   NULL)
 	PHP_FE_END	/* Must be the last line in zero_functions[] */
 };
 /* }}} */
