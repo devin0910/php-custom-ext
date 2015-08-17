@@ -176,6 +176,188 @@ PHP_FUNCTION(uniquechars)
 }
 /* }}} */
 
+/* {{{ proto void add_variables()
+ *    Add local or global variables */
+PHP_FUNCTION(add_variables)
+{
+    zval *new1, *new2;
+
+    MAKE_STD_ZVAL(new1);
+    MAKE_STD_ZVAL(new2);
+
+    ZVAL_LONG(new1, 100);
+    ZVAL_LONG(new2, 500);
+
+    ZEND_SET_SYMBOL(EG(active_symbol_table), "new_local_var", new1);
+    ZEND_SET_SYMBOL(&EG(symbol_table), "new_global_var", new2);
+
+    RETURN_NULL();
+}
+/* }}} */
+
+/* {{{ proto void add_variables2()
+ *    Add local or global variables */
+PHP_FUNCTION(add_variables2)
+{
+    zval *new1, *new2;
+
+    MAKE_STD_ZVAL(new1);
+    MAKE_STD_ZVAL(new2);
+
+    ZVAL_LONG(new1, 100);
+    ZVAL_LONG(new2, 500);
+
+    zend_hash_update(EG(active_symbol_table),
+            "new_local_var",
+            strlen("new_local_var") + 1,
+            &new1,
+            sizeof(zval*),
+            NULL
+    );
+
+    zend_hash_update(&EG(symbol_table),
+            "new_global_var",
+            strlen("new_global_var") + 1,
+            &new2,
+            sizeof(zval*),
+            NULL
+    );
+
+    RETURN_NULL();
+}
+/* }}} */
+
+/* {{{ proto array return_array1()
+ *    Test returning array #1 */
+PHP_FUNCTION(return_array1)
+{
+    if (ZEND_NUM_ARGS() != 0) {
+        WRONG_PARAM_COUNT;
+    }
+
+    array_init(return_value);
+
+    add_next_index_long(return_value, 5);
+    add_next_index_long(return_value, 4);
+    add_next_index_long(return_value, 3);
+    add_next_index_long(return_value, 2);
+    add_next_index_long(return_value, 1);
+}
+/* }}} */
+
+/* {{{ proto array return_array2()
+ *    Test returning array #2 */
+PHP_FUNCTION(return_array2)
+{
+    zval *sub_array1;
+    zval *sub_array2;
+
+    if (ZEND_NUM_ARGS() != 0) {
+        WRONG_PARAM_COUNT;
+    }
+
+    array_init(return_value);
+    add_next_index_long(return_value, 1);
+    add_next_index_unset(return_value);
+    add_next_index_bool(return_value, 1);
+    add_next_index_double(return_value, 3.1415);
+    add_next_index_string(return_value, "Testing", 1);
+
+    /* create s sub array to put within the return value */
+    MAKE_STD_ZVAL(sub_array1);
+    array_init(sub_array1);
+    add_next_index_long(sub_array1, 2);
+    add_next_index_string(sub_array1, "This is the second element in the first sub_array", 1);
+
+    /* create a sub array to put within the first sub array */
+    MAKE_STD_ZVAL(sub_array2);
+    array_init(sub_array2);
+    add_next_index_long(sub_array2, 2);
+    add_next_index_string(sub_array2, "This is the second element in the second sub_array", 1);
+
+    /* insert the sub arrays into their parent arrays */
+    add_next_index_zval(sub_array1, sub_array2);
+    add_next_index_zval(return_value, sub_array1);
+}
+/* }}} */
+
+/* {{{ proto array return_array2()
+ *    Test returning array #3 */
+PHP_FUNCTION(return_array3)
+{
+    if (ZEND_NUM_ARGS() != 0) {
+        WRONG_PARAM_COUNT;
+    }
+
+    array_init(return_value);
+    add_index_long(return_value, 7, 1);
+    add_next_index_long(return_value, 2);
+
+    add_index_string(return_value, 300, "Hello world!", 1);
+    add_next_index_string(return_value, "Next index insert", 1);
+}
+/* }}} */
+
+/* {{{ proto array return_array4()
+ *    Test returning array #4 */
+PHP_FUNCTION(return_array4)
+{
+    if (ZEND_NUM_ARGS() != 0) {
+        WRONG_PARAM_COUNT;
+    }
+
+    array_init(return_value);
+
+    add_assoc_string(return_value, "apple", "red", 1);
+    add_assoc_string(return_value, "banana", "yellow", 1);
+    add_assoc_string(return_value, "orange", "orange", 1);
+
+    add_assoc_long(return_value, "one", 1);
+    add_assoc_long(return_value, "two", 2);
+    add_assoc_long(return_value, "apple", 3);
+}
+/* }}} */
+
+PHP_FUNCTION(traverse_array)
+{
+    zval* array;
+    zval** item;
+    int count, i;
+    char buffer[1024];
+
+    array_init(return_value);
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "a", &array) == FAILURE) {
+        return;
+    }
+
+    // get number of elements in the array
+    count = zend_hash_num_elements(Z_ARRVAL_P(array));
+    sprintf(buffer, "array_size = %d", count);
+    add_next_index_string(return_value, buffer, 1);
+
+    // move to the begining of the array
+    zend_hash_internal_pointer_reset(Z_ARRVAL_P(array));
+    for (i = 0; i < count; i++) {
+        char* key;
+        int ind;
+
+        // get the data in the current array element and coerce into a string
+        zend_hash_get_current_data(Z_ARRVAL_P(array), (void **) &item);
+        convert_to_string_ex(item);
+
+        // get the key (note this function returns key type)
+        if (zend_hash_get_current_key(Z_ARRVAL_P(array), &key, &ind, 0) == HASH_KEY_IS_STRING) {
+            sprintf(buffer, "array[%s] = %s", key, Z_STRVAL_PP(item));
+            add_next_index_string(return_value, buffer, 1);
+        } else {
+           sprintf(buffer, "array[%d] = %s", ind, Z_STRVAL_PP(item));
+           add_next_index_string(return_value, buffer, 1);
+       }
+
+       zend_hash_move_forward(Z_ARRVAL_P(array));
+    }
+}
 
 /* {{{ php_zero_init_globals
  */
@@ -251,6 +433,13 @@ const zend_function_entry zero_functions[] = {
 	PHP_FE(calcpi,	NULL)
 	PHP_FE(reverse,	NULL)
 	PHP_FE(uniquechars,	NULL)
+    PHP_FE(add_variables,   NULL)
+    PHP_FE(add_variables2,   NULL)
+    PHP_FE(return_array1,   NULL)
+    PHP_FE(return_array2,   NULL)
+    PHP_FE(return_array3,   NULL)
+    PHP_FE(return_array4,   NULL)
+    PHP_FE(traverse_array,   NULL)
 	PHP_FE_END	/* Must be the last line in zero_functions[] */
 };
 /* }}} */

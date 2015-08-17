@@ -1,3 +1,4 @@
 double calcpi( int iterations) Calculate Pi
 string reverse( string input ) Reverse the input string
 array uniquechars( string input [, bool case_sensitive] ) Return the unique characters in the input string
+void add_variables() Add local or global variables
