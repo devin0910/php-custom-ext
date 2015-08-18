@@ -421,7 +421,11 @@ PHP_FUNCTION(array_find)
             convert_to_string_ex(item);
             sprintf(buffer, "data at current array location: %s", Z_STRVAL_PP(item));
             add_next_index_string(return_value, buffer, 1);
-        } else if (zend_parse_parameters_ex(ZEND_PARSE_PARAMS_QUIET, ZEND_NUM_ARGS() TSRMLS_CC, "as" , &array, &string_index, &string_index_len) == SUCCESS) {
+        } else {
+            sprintf(buffer, "index [%d] not found in array", long_index);
+            add_next_index_string(return_value, buffer, 1);
+        }
+    } else if (zend_parse_parameters_ex(ZEND_PARSE_PARAMS_QUIET, ZEND_NUM_ARGS() TSRMLS_CC, "as" , &array, &string_index, &string_index_len) == SUCCESS) {
             // find item indexed by assoc string
             if (zend_hash_find(Z_ARRVAL_P(array), string_index, string_index_len + 1, (void **)&item) == SUCCESS) {
                 convert_to_string_ex(item);
@@ -431,12 +435,14 @@ PHP_FUNCTION(array_find)
                 convert_to_string_ex(item);
                 sprintf(buffer, "data at current array location: %s", Z_STRVAL_PP(item));
                 add_next_index_string(return_value, buffer, 1);
+            } else {
+                sprintf(buffer, "index [%s] nout found in array", string_index);
+                add_next_index_string(return_value, buffer, 1);
             }
-        } else {
-            php_error(E_WARNING, "usage %s(array, [string|integer])", get_active_function_name(TSRMLS_C));
-            RETURN_FALSE;
-        }
-    }
+    } else {
+       php_error(E_WARNING, "usage %s(array, [string|integer])", get_active_function_name(TSRMLS_C));
+       RETURN_FALSE;
+   }
 }
 
 /* {{{ php_zero_init_globals
