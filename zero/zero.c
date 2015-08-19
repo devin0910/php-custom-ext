@@ -27,6 +27,8 @@
 #include "ext/standard/info.h"
 #include "php_zero.h"
 
+void inspect(zval* value);
+
 /* If you declare any globals in php_zero.h uncomment this:
 ZEND_DECLARE_MODULE_GLOBALS(zero)
 */
@@ -445,6 +447,51 @@ PHP_FUNCTION(array_find)
    }
 }
 
+PHP_FUNCTION(array_delete)
+{
+    zval* array;
+    zval** item;
+    int long_index;
+    char* string_index;
+    int string_index_len;
+    char buffer[1024];
+
+    array_init(return_value);
+
+    if (zend_parse_parameters_ex(ZEND_PARSE_PARAMS_QUIET, ZEND_NUM_ARGS() TSRMLS_CC, "al", &array, &long_index) == SUCCESS) {
+        if (!PZVAL_IS_REF(array)) {
+            php_error(E_WARNING, "The array parameter must be passed by reference");
+            return;
+        }
+
+        // delete item indexed by integer, long_index
+        zend_hash_index_del(Z_ARRVAL_P(array), long_index);
+    } else if (zend_parse_parameters_ex(ZEND_PARSE_PARAMS_QUIET, ZEND_NUM_ARGS() TSRMLS_CC, "as", &array, &string_index, &string_index_len) == SUCCESS) {
+        if (!PZVAL_IS_REF(array)) {
+            php_error(E_WARNING, "The array parameter must be passed by reference");
+            return;
+        }
+        
+        // delete item indexed by assoc string, string index
+        zend_hash_del(Z_ARRVAL_P(array), string_index, string_index_len + 1);
+    } else {
+        php_error(E_WARNING, "usage %s(&array, [string|integer])", get_active_function_name(TSRMLS_C));
+        RETURN_FALSE;
+    }
+}
+
+PHP_FUNCTION(test_inspect)
+{
+    zval *value;
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &value) == FAILURE) {
+        return;
+    }
+
+    inspect(value);
+}
+
+
 /* {{{ php_zero_init_globals
  */
 /* Uncomment this function if you have INI entries
@@ -528,6 +575,8 @@ const zend_function_entry zero_functions[] = {
     PHP_FE(traverse_array,   NULL)
     PHP_FE(traverse_array_r,   NULL)
     PHP_FE(array_find,   NULL)
+    PHP_FE(array_delete,   NULL)
+    PHP_FE(test_inspect,   NULL)
 	PHP_FE_END	/* Must be the last line in zero_functions[] */
 };
 /* }}} */
@@ -551,6 +600,64 @@ zend_module_entry zero_module_entry = {
 #ifdef COMPILE_DL_ZERO
 ZEND_GET_MODULE(zero)
 #endif
+
+void inspect(zval* value)
+{
+    switch (Z_TYPE_P(value)) {
+        case IS_NULL:
+            php_printf("The variable passed is of type IS_NULL\n");
+            break;
+        case IS_LONG:
+            php_printf("The variable passed is of type IS_LONG\n");
+            php_printf("The content is %ld\n", Z_LVAL_P(value));
+            break;
+        case IS_DOUBLE:
+            php_printf("The variable passed is of type IS_DOUBLE\n");
+            php_printf("The content is %f\n", Z_DVAL_P(value));
+            break;
+#if PHP_VERSION_ID >= 70000
+        case IS_TRUE:
+            php_printf("The variable passed is of type IS_TRUE\n");
+            break;
+        case IS_FALSE:
+            php_printf("The variable passed is of type IS_FALSE\n");
+            break;
+#else
+        case IS_BOOL:
+            php_printf("The variable passed is of type IS_BOOL\n");
+            break;
+#endif
+        case IS_OBJECT:
+            php_printf("The variable passed is of type IS_OBJECT\n");
+            break;
+        case IS_STRING:
+            php_printf("The variable passed is of type IS_STRING\n");
+            php_printf("The content is \"%s\"\n", Z_STRVAL_P(value));
+            php_printf("The content reversed is \"");
+            char *p = Z_STRVAL_P(value) + Z_STRLEN_P(value);
+            while (--p >= Z_STRVAL_P(value))
+                php_printf("%c", *p);
+            php_printf("\"\n");
+            break;
+        case IS_RESOURCE:
+            php_printf("The variable is of type IS_RESOURCE\n");
+            php_printf("The number of resource is: %ld\n",
+#if PHP_VERSION_ID >= 7000
+                    Z_RES_HANDLE_P(value)
+#else
+                    Z_RESVAL_P(value);
+#endif
+                    );
+            break;
+        case IS_ARRAY:
+            php_printf("The variable passed is type of IS_ARRAY\n");
+            php_printf("There is %ld direct elements in the array\n", zend_hash_num_elements(Z_ARRVAL_P(value)));
+            break;
+        default:
+            php_printf("unkown type");
+            break;
+    }
+}
 
 /*
  * Local variables:
