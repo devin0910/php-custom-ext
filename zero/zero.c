@@ -491,9 +491,175 @@ PHP_FUNCTION(test_inspect)
     inspect(value);
 }
 
+PHP_FUNCTION(return_object)
+{
+    zval* array;
+    zval* emb_obj;
+
+    object_init(return_value);
+
+    add_property_long(return_value, "long_property", 1);
+    add_property_unset(return_value, "unset_property");
+    add_property_bool(return_value, "bool_property", 1);
+    add_property_double(return_value, "double_property", 3.14);
+    add_property_string(return_value, "string_property", "This is a string", 1);
+    MAKE_STD_ZVAL(emb_obj);
+    object_init(emb_obj);
+
+    add_property_long(emb_obj, "long_property", 2);
+    add_property_unset(emb_obj, "unset_property");
+    add_property_bool(emb_obj, "bool_property", 0);
+    add_property_double(emb_obj, "double_property", 2.71);
+    add_property_string(emb_obj, "string_property", "This is a string in an embedded sub-object", 1);
+
+    add_property_zval(return_value, "object_property", emb_obj);
+
+    MAKE_STD_ZVAL(array);
+    array_init(array);
+    
+    add_next_index_long(array, 1);
+    add_next_index_long(array, 3);
+    add_next_index_long(array, 5);
+
+    add_property_zval(return_value, "array_property", array);
+}
+
+PHP_FUNCTION(traverse_object)
+{
+    zval* object;
+    zval** item;
+    int count, i;
+    char buffer[1024];
+
+    array_init(return_value);
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "o", &object) == FAILURE) {
+        return;
+    }
+
+    // get number of elements in the object
+    count = zend_hash_num_elements(Z_OBJPROP_P(object));
+    sprintf(buffer, "object property count = %d", count);
+    add_next_index_string(return_value, buffer, 1);
+
+    // move to the begining of the object properties
+    zend_hash_internal_pointer_reset(Z_OBJPROP_P(object));
+    for (i = 0; i < count; i++) {
+        char* key;
+        int ind;
+
+        // get the data in the current property and coerce into a string
+        zend_hash_get_current_data(Z_OBJPROP_P(object), (void **)&item);
+        convert_to_string_ex(item);
+
+        // get the key (note this function returns key type)
+        if (zend_hash_get_current_key(Z_OBJPROP_P(object), &key, &ind, 0) == HASH_KEY_IS_STRING) {
+            sprintf(buffer, "object->%s = %s", key, Z_STRVAL_PP(item));
+            add_next_index_string(return_value, buffer, 1);
+        } else {
+            sprintf(buffer, "object->%d = %s", ind, Z_STRVAL_PP(item));
+            add_next_index_string(return_value, buffer, 1);
+        }
+
+        zend_hash_move_forward(Z_OBJPROP_P(object));
+    }
+}
+
+PHP_FUNCTION(obj_prop_find)
+{
+    zval* object;
+    zval** item;
+    char* string_index;
+    int string_index_len;
+    char buffer[1024];
+
+    array_init(return_value);
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "os", &object, &string_index, &string_index_len) != SUCCESS) {
+        return;
+    }
+
+    // find property with name = string_index
+    if (zend_hash_find(Z_OBJPROP_P(object), string_index, string_index_len + 1, (void**) item) == SUCCESS) {
+        convert_to_string_ex(item);
+        sprintf(buffer, "obj->%s found containing data %s", string_index, Z_STRVAL_PP(item));
+        add_next_index_string(return_value, buffer, 1);
+    } else {
+        sprintf(buffer, "object->%s not found", string_index);
+        add_next_index_string(return_value, buffer, 1);
+    }
+}
+
+PHP_FUNCTION(obj_prop_delete)
+{
+    zval* object;
+    zval** item;
+    char* string_index;
+    int string_index_len;
+    char buffer[1024];
+
+    array_init(return_value);
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "os", &object, &string_index, &string_index_len) != SUCCESS) {
+        return;
+    }
+
+    if (!PZVAL_IS_REF(object)) {
+        php_error(E_WARNING, "The object parameter must be passed by reference");
+        return;
+    }
+
+    zend_hash_del(Z_OBJPROP_P(object), string_index, string_index_len + 1);
+}
+
+PHP_FUNCTION(open_resource)
+{
+    zero_resource* resource;
+    int rscid;
+
+    // this function accepts no arguments and returns a resource
+    resource = emalloc(sizeof(zero_resource));
+    resource->fp = fopen("/etc/hosts", "r");
+
+    rscid = ZEND_REGISTER_RESOURCE(return_value, resource, le_zero);
+    RETVAL_RESOURCE(rscid);
+}
+
+PHP_FUNCTION(read_resource)
+{
+    zero_resource* resource;
+    zval* arg1;
+    char fileline[1024];
+
+    // this function accepts a resource and returns a single line from the file abstracted by the resource
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &arg1) == FAILURE) {
+        return;
+    }
+
+    ZEND_FETCH_RESOURCE(resource, zero_resource*, &arg1, -1, le_zero_name, le_zero);
+
+    if (resource) {
+        if (fgets(fileline, 1024, resource->fp)) {
+            RETURN_STRING(fileline, 1);
+        } else {
+            RETURN_FALSE;
+        }
+    }
+}
+
+PHP_FUNCTION(close_resource)
+{
+    zval* arg1;
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &arg1) == FAILURE) {
+        return;
+    }
+
+    zend_list_delete(Z_RESVAL_P(arg1));
+}
 
 /* {{{ php_zero_init_globals
  */
+
 /* Uncomment this function if you have INI entries
 static void php_zero_init_globals(zend_zero_globals *zero_globals)
 {
@@ -510,6 +676,13 @@ PHP_MINIT_FUNCTION(zero)
 	/* If you have INI entries, uncomment these lines 
 	REGISTER_INI_ENTRIES();
 	*/
+    zend_printf("In PHP_MINIT_FUNCTION\n");
+    // ZEND_INIT_MODULE_GLOBALS(zero, php_zero_init_globals, NULL);
+    // zend_printf("global_value = %d\n", ZERO_G(global_value));
+    // REGISTER_INI_ENTRIES();
+    // zend_printf("global_value = %d\n", ZERO_G(global_value));
+    le_zero = zend_register_list_destructor_ex(zero_destruction_handler, NULL, le_zero_name, module_number);
+
 	return SUCCESS;
 }
 /* }}} */
@@ -577,6 +750,13 @@ const zend_function_entry zero_functions[] = {
     PHP_FE(array_find,   NULL)
     PHP_FE(array_delete,   NULL)
     PHP_FE(test_inspect,   NULL)
+    PHP_FE(return_object,   NULL)
+    PHP_FE(traverse_object,   NULL)
+    PHP_FE(obj_prop_find,   NULL)
+    PHP_FE(obj_prop_delete,   NULL)
+    PHP_FE(open_resource,   NULL)
+    PHP_FE(read_resource,   NULL)
+    PHP_FE(close_resource,   NULL)
 	PHP_FE_END	/* Must be the last line in zero_functions[] */
 };
 /* }}} */
@@ -657,6 +837,17 @@ void inspect(zval* value)
             php_printf("unkown type");
             break;
     }
+}
+
+void general_destruction_handler(zend_rsrc_list_entry *rsrc TSRMLS_DC)
+{
+    zero_resource* resource;
+
+    zend_printf("In zero_destruction_handler\n");
+
+    resource = (zero_resource*) rsrc->ptr;
+    fclose(resource->fp);
+    efree(resource);
 }
 
 /*
