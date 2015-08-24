@@ -666,6 +666,32 @@ PHP_FUNCTION(close_resource)
     zend_list_delete(Z_RESVAL_P(arg1));
 }
 
+PHP_FUNCTION(execution_info)
+{
+    const char* func_name;
+    const char* file_name;
+    uint lineno;
+
+    array_init(return_value);
+
+    /*php_printf("function name: %s", get_active_function_name(TSRMLS_C));*/
+    if (func_name = get_active_function_name(TSRMLS_C)) {
+        add_assoc_string(return_value, "function", func_name, 1);
+    } else {
+        add_assoc_string(return_value, "function", "<no function>", 1);
+    }
+
+    if (file_name = zend_get_executed_filename(TSRMLS_C))
+        add_assoc_string(return_value, "file", file_name, 1);
+    else
+        add_assoc_string(return_value, "file", "<unknown file>", 1);
+
+    if (lineno = zend_get_executed_lineno(TSRMLS_C))
+        add_assoc_long(return_value, "lineno", lineno);
+    else
+        add_assoc_string(return_value, "lineno", "<unknown line>", 1);
+}
+
 /* {{{ php_zero_init_globals
  */
 
@@ -766,6 +792,7 @@ const zend_function_entry zero_functions[] = {
     PHP_FE(open_resource,   NULL)
     PHP_FE(read_resource,   NULL)
     PHP_FE(close_resource,   NULL)
+    PHP_FE(execution_info,   NULL)
 	PHP_FE_END	/* Must be the last line in zero_functions[] */
 };
 /* }}} */
