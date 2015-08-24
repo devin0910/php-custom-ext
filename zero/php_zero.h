@@ -66,15 +66,6 @@ ZEND_END_MODULE_GLOBALS(zero)
 
 #endif	/* PHP_ZERO_H */
 
-void zero_destruction_handler(zend_rsrc_list_entry *rsrc TSRMLS_DC);
-
-typedef struct _zero_resource
-{
-    FILE* fp;
-} zero_resource;
-
-#define le_zero_name "General Resource"
-
 /*
  * Local variables:
  * tab-width: 4

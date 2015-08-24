@@ -29,6 +29,15 @@
 
 void inspect(zval* value);
 
+void zero_destruction_handler(zend_rsrc_list_entry *rsrc TSRMLS_DC);
+
+typedef struct _zero_resource
+{
+    FILE* fp;
+} zero_resource;
+
+#define le_zero_name "Zero Resource"
+
 /* If you declare any globals in php_zero.h uncomment this:
 ZEND_DECLARE_MODULE_GLOBALS(zero)
 */
@@ -681,7 +690,7 @@ PHP_MINIT_FUNCTION(zero)
     // zend_printf("global_value = %d\n", ZERO_G(global_value));
     // REGISTER_INI_ENTRIES();
     // zend_printf("global_value = %d\n", ZERO_G(global_value));
-    le_zero = zend_register_list_destructor_ex(zero_destruction_handler, NULL, le_zero_name, module_number);
+    le_zero = zend_register_list_destructors_ex(zero_destruction_handler, NULL, le_zero_name, module_number);
 
 	return SUCCESS;
 }
@@ -839,7 +848,7 @@ void inspect(zval* value)
     }
 }
 
-void general_destruction_handler(zend_rsrc_list_entry *rsrc TSRMLS_DC)
+void zero_destruction_handler(zend_rsrc_list_entry *rsrc TSRMLS_DC)
 {
     zero_resource* resource;
 
