@@ -692,6 +692,77 @@ PHP_FUNCTION(execution_info)
         add_assoc_string(return_value, "lineno", "<unknown line>", 1);
 }
 
+PHP_FUNCTION(callback_test)
+{
+    zval* input_array;
+    zval* callback_func;
+    char* func_name;
+    int count, i;
+    zval** args[2];
+    zval** item;
+    zval* retval = NULL;
+
+    // make sure there are 2 args
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, 'zz', &input_array, &callback_func) == FAILURE) {
+        return;
+    }
+
+    /*inspect(input_array);*/
+    php_printf("hello world!");
+    return;
+
+    if (Z_TYPE_P(input_array) != IS_ARRAY) {
+        zend_error(E_WARNING, "First argument must be an array");
+        return;
+    }
+
+    if (!zend_is_callable(callback_func, 0, &func_name)) {
+        zend_error(E_WARNING, "Second argument must be a callback function or method");
+        efree(func_name);
+        return;
+    }
+    efree(func_name);
+
+    return;
+    array_init(return_value);
+
+    // get number of elements in the array
+    count = zend_hash_num_elements(Z_ARRVAL_P(input_array));
+
+    // move to the begining of the array
+    zend_hash_internal_pointer_reset(Z_ARRVAL_P(input_array));
+    for (i = 0; i < count; i++) {
+        char* key;
+        int ind;
+        zval** zkey;
+
+        // get the data in the current array element and coerce into a string
+        zend_hash_get_current_data(Z_ARRVAL_P(input_array), (void**) &item);
+
+        MAKE_STD_ZVAL(*zkey);
+
+        // get the key
+        if (zend_hash_get_current_key(Z_ARRVAL_P(input_array), &key, &ind, 0) == HASH_KEY_IS_STRING) {
+            ZVAL_STRING(*zkey, key, 1);
+        } else {
+            ZVAL_LONG(*zkey, ind);
+        }
+
+        args[0] = zkey;
+        args[1] = item;
+
+        if (call_user_function_ex(EG(function_table), NULL, callback_func, &retval, 2, args, 0, NULL TSRMLS_CC) == SUCCESS) {
+            convert_to_string_ex(&return_value);
+            add_next_index_string(return_value, Z_STRVAL_P(retval), 1);
+            zval_dtor(retval);
+        } else {
+            zend_error(E_ERROR, "An error occurred while attempting to call the user callback");
+        }
+
+        zend_hash_move_forward(Z_ARRVAL_P(input_array));
+    }
+}
+
 /* {{{ php_zero_init_globals
  */
 
@@ -711,7 +782,7 @@ PHP_MINIT_FUNCTION(zero)
 	/* If you have INI entries, uncomment these lines 
 	REGISTER_INI_ENTRIES();
 	*/
-    zend_printf("In PHP_MINIT_FUNCTION\n");
+    // zend_printf("In PHP_MINIT_FUNCTION\n");
     // ZEND_INIT_MODULE_GLOBALS(zero, php_zero_init_globals, NULL);
     // zend_printf("global_value = %d\n", ZERO_G(global_value));
     // REGISTER_INI_ENTRIES();
@@ -793,6 +864,7 @@ const zend_function_entry zero_functions[] = {
     PHP_FE(read_resource,   NULL)
     PHP_FE(close_resource,   NULL)
     PHP_FE(execution_info,   NULL)
+    PHP_FE(callback_test,   NULL)
 	PHP_FE_END	/* Must be the last line in zero_functions[] */
 };
 /* }}} */
@@ -858,10 +930,10 @@ void inspect(zval* value)
         case IS_RESOURCE:
             php_printf("The variable is of type IS_RESOURCE\n");
             php_printf("The number of resource is: %ld\n",
-#if PHP_VERSION_ID >= 7000
+#if PHP_VERSION_ID >= 70000
                     Z_RES_HANDLE_P(value)
 #else
-                    Z_RESVAL_P(value);
+                    Z_RESVAL_P(value)
 #endif
                     );
             break;
